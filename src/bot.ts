@@ -8,11 +8,10 @@ import type { Variant as TextEffectVariant } from "./textEffects";
 // Create a bot using the Telegram token
 const bot = new Bot(process.env.TELEGRAM_TOKEN || "");
 
-// Handle the /start and /yo commands
-bot.command("start", (ctx) => ctx.reply("Welcome! Up and running."));
+// Handle the /yo command to greet the user
 bot.command("yo", (ctx) => ctx.reply(`Yo ${ctx.from?.username}`));
 
-// Handle the /effect command
+// Handle the /effect command to apply text effects using an inline keyboard
 type Effect = { code: TextEffectVariant; label: string };
 const allEffects: Effect[] = [
   {
@@ -157,28 +156,32 @@ const aboutUrlKeyboard = new InlineKeyboard().url(
   "Host your own bot for free.",
   "https://cyclic.sh/"
 );
-bot.command("about", (ctx) =>
-  ctx.reply(
-    `Hello! I'm a Telegram bot.\nI'm powered by Cyclic, the next-generation serverless computing platform.`,
-    {
-      reply_markup: aboutUrlKeyboard,
-    }
-  )
-);
 
 // Suggest commands in the menu
 bot.api.setMyCommands([
-  { command: "start", description: "Start the bot" },
   { command: "yo", description: "Be greeted by the bot" },
-  { command: "about", description: "Learn more about the bot" },
   {
     command: "effect",
     description: "Apply text effects on the text. (usage: /effect [text])",
   },
 ]);
 
-// Handle all other messages
-bot.on("message", (ctx) => ctx.reply("Got another message!"));
+// Handle all other messages and the /start command
+const introductionMessage = `Hello! I'm a Telegram bot.
+I'm powered by Cyclic, the next-generation serverless computing platform.
+
+<b>Commands</b>
+/yo - Be greeted by me
+/effect [text] - Show a keyboard to apply text effects to [text]`;
+
+const replyWithIntro = (ctx: any) =>
+  ctx.reply(introductionMessage, {
+    reply_markup: aboutUrlKeyboard,
+    parse_mode: "HTML",
+  });
+
+bot.command("start", replyWithIntro);
+bot.on("message", replyWithIntro);
 
 // Start the server
 if (process.env.NODE_ENV === "production") {

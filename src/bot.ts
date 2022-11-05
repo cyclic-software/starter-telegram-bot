@@ -166,6 +166,17 @@ bot.command("about", (ctx) =>
   )
 );
 
+// Suggest commands in the menu
+bot.api.setMyCommands([
+  { command: "start", description: "Start the bot" },
+  { command: "yo", description: "Be greeted by the bot" },
+  { command: "about", description: "Learn more about the bot" },
+  {
+    command: "effect",
+    description: "Apply text effects on the text. (usage: /effect [text])",
+  },
+]);
+
 // Handle all other messages
 bot.on("message", (ctx) => ctx.reply("Got another message!"));
 

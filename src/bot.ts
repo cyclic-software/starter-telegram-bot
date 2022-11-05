@@ -114,6 +114,20 @@ for (const effect of allEffects) {
   });
 }
 
+// Handle the /about command
+const aboutUrlKeyboard = new InlineKeyboard().url(
+  "Host your own bot for free.",
+  "https://cyclic.sh/"
+);
+bot.command("about", (ctx) =>
+  ctx.reply(
+    `Hello! I'm a Telegram bot.\nI'm powered by Cyclic, the next-generation serverless computing platform.`,
+    {
+      reply_markup: aboutUrlKeyboard,
+    }
+  )
+);
+
 // Handle all other messages
 bot.on("message", (ctx) => ctx.reply("Got another message!"));
 

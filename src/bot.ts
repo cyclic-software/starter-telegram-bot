@@ -1,7 +1,7 @@
 import { Bot, InlineKeyboard, webhookCallback } from "grammy";
 import { chunk } from "lodash";
 import express from "express";
-import { applyTextEffect } from "./textEffects";
+import { applyTextEffect, Variant } from "./textEffects";
 
 import type { Variant as TextEffectVariant } from "./textEffects";
 
@@ -94,6 +94,44 @@ bot.command("effect", (ctx) =>
     ),
   })
 );
+
+// Handle inline queries
+const queryRegEx = /effect (monospace|bold|italic) (.*)/;
+bot.inlineQuery(queryRegEx, async (ctx) => {
+  const fullQuery = ctx.inlineQuery.query;
+  const fullQueryMatch = fullQuery.match(queryRegEx);
+  if (!fullQueryMatch) return;
+
+  const effectLabel = fullQueryMatch[1];
+  const originalText = fullQueryMatch[2];
+
+  const effectCode = allEffects.find(
+    (effect) => effect.label.toLowerCase() === effectLabel.toLowerCase()
+  )?.code;
+  const modifiedText = applyTextEffect(originalText, effectCode as Variant);
+
+  await ctx.answerInlineQuery(
+    [
+      {
+        type: "article",
+        id: "text-effect",
+        title: "Text Effects",
+        input_message_content: {
+          message_text: `Original: ${originalText}
+Modified: ${modifiedText}`,
+          parse_mode: "HTML",
+        },
+        reply_markup: new InlineKeyboard().switchInline("Share", fullQuery),
+        url: "http://t.me/EludaDevSmarterBot",
+        description: "Create stylish Unicode text, all within Telegram.",
+      },
+    ],
+    { cache_time: 30 * 24 * 3600 } // one month in seconds
+  );
+});
+
+// Return empty result list for other queries.
+bot.on("inline_query", (ctx) => ctx.answerInlineQuery([]));
 
 // Handle text effects from the effect keyboard
 for (const effect of allEffects) {

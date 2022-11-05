@@ -10,7 +10,7 @@ bot.command("yo", (ctx) => ctx.reply(`Yo ${ctx.from?.username}`));
 
 // Handle the /about command
 const aboutUrlKeyboard = new InlineKeyboard().url(
-  "Host your own bot",
+  "Host your own bot for free.",
   "https://cyclic.sh/"
 );
 bot.command("about", (ctx) =>

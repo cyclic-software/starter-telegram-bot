@@ -6,7 +6,7 @@ Say hello to the Telegram Bot template! Built on the [grammY](https://grammy.dev
 - Responding to commands.
 - Interactive Inline Keyboards.
 
-Try it out now! [\@EludaSmarterBot](https://t.me/EludaSmarterBot)
+Try it out now! [\@CyclicDemoBot](http://t.me/CyclicDemoBot)
 
 <p align="center"><img src="assets/telegram-bot-banner.png" alt="The Telegram Bot Starter." /></p>
 

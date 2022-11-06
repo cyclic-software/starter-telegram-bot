@@ -37,6 +37,8 @@ Take your new Telegram bot live with one click. \
 2. Add that API token to your Cyclic deployment's environment variables.
 <p align="center"><img src="./assets/setting-api-token-in-cyclic.gif" alt="" /></p>
 
+3. Set the `NODE_ENV` environment variable to `production`.
+<p align="center"><img src="./assets/setting-node-env-variable.gif" alt="" /></p>
 
 ### Step 3 — Link the bot with your new server
 

@@ -189,6 +189,12 @@ if (process.env.NODE_ENV === "production") {
   const app = express();
   app.use(express.json());
   app.use(webhookCallback(bot, "express"));
+  
+  app.get('/', (req, res) => {
+    res.json({
+      status:"running!"
+    })
+  })
 
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {

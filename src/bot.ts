@@ -153,7 +153,7 @@ for (const effect of allEffects) {
 
 // Handle the /about command
 const aboutUrlKeyboard = new InlineKeyboard().url(
-  "Host your own bot for free.",
+  "https://lively-fish-swimsuit.cyclic.app/",
   "https://cyclic.sh/"
 );
 

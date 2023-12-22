@@ -1,187 +1,105 @@
-import { Bot, InlineKeyboard, webhookCallback } from "grammy";
+mport { Bot, Router, Markup, InlineKeyboard, webhookCallback } from "grammy";
 import { chunk } from "lodash";
 import express from "express";
-import { applyTextEffect, Variant } from "./textEffects";
 
-import type { Variant as TextEffectVariant } from "./textEffects";
 
 // Create a bot using the Telegram token
 const bot = new Bot(process.env.TELEGRAM_TOKEN || "");
 
-// Handle the /yo command to greet the user
-bot.command("yo", (ctx) => ctx.reply(`Yo ${ctx.from?.username}`));
+const waitingList = [];
+const chatSessions = {};
+let blockerEnabled = false;
 
-// Handle the /effect command to apply text effects using an inline keyboard
-type Effect = { code: TextEffectVariant; label: string };
-const allEffects: Effect[] = [
-  {
-    code: "w",
-    label: "Monospace",
-  },
-  {
-    code: "b",
-    label: "Bold",
-  },
-  {
-    code: "i",
-    label: "Italic",
-  },
-  {
-    code: "d",
-    label: "Doublestruck",
-  },
-  {
-    code: "o",
-    label: "Circled",
-  },
-  {
-    code: "q",
-    label: "Squared",
-  },
-];
+bot.command('start', async (ctx) => {
+    const description = `Welcome to the Encrypted Pair Chat Bot!\n\nThis chat bot pairs you with a random stranger for an encrypted chat session.\n\nRules:\n- Speak in English.\n- Be respectful and polite.\n- Do not share personal information.\n- Do not engage in illegal or harmful activities.\n\nCommands:\nTo start chatting, type /find.\nTo find the next stranger, type /next.\nTo End the chat, type /end.\n\nEnjoy your chat!`;
 
-const effectCallbackCodeAccessor = (effectCode: TextEffectVariant) =>
-  `effect-${effectCode}`;
-
-const effectsKeyboardAccessor = (effectCodes: string[]) => {
-  const effectsAccessor = (effectCodes: string[]) =>
-    effectCodes.map((code) =>
-      allEffects.find((effect) => effect.code === code)
-    );
-  const effects = effectsAccessor(effectCodes);
-
-  const keyboard = new InlineKeyboard();
-  const chunkedEffects = chunk(effects, 3);
-  for (const effectsChunk of chunkedEffects) {
-    for (const effect of effectsChunk) {
-      effect &&
-        keyboard.text(effect.label, effectCallbackCodeAccessor(effect.code));
-    }
-    keyboard.row();
-  }
-
-  return keyboard;
-};
-
-const textEffectResponseAccessor = (
-  originalText: string,
-  modifiedText?: string
-) =>
-  `Original: ${originalText}` +
-  (modifiedText ? `\nModified: ${modifiedText}` : "");
-
-const parseTextEffectResponse = (
-  response: string
-): {
-  originalText: string;
-  modifiedText?: string;
-} => {
-  const originalText = (response.match(/Original: (.*)/) as any)[1];
-  const modifiedTextMatch = response.match(/Modified: (.*)/);
-
-  let modifiedText;
-  if (modifiedTextMatch) modifiedText = modifiedTextMatch[1];
-
-  if (!modifiedTextMatch) return { originalText };
-  else return { originalText, modifiedText };
-};
-
-bot.command("effect", (ctx) =>
-  ctx.reply(textEffectResponseAccessor(ctx.match), {
-    reply_markup: effectsKeyboardAccessor(
-      allEffects.map((effect) => effect.code)
-    ),
-  })
-);
-
-// Handle inline queries
-const queryRegEx = /effect (monospace|bold|italic) (.*)/;
-bot.inlineQuery(queryRegEx, async (ctx) => {
-  const fullQuery = ctx.inlineQuery.query;
-  const fullQueryMatch = fullQuery.match(queryRegEx);
-  if (!fullQueryMatch) return;
-
-  const effectLabel = fullQueryMatch[1];
-  const originalText = fullQueryMatch[2];
-
-  const effectCode = allEffects.find(
-    (effect) => effect.label.toLowerCase() === effectLabel.toLowerCase()
-  )?.code;
-  const modifiedText = applyTextEffect(originalText, effectCode as Variant);
-
-  await ctx.answerInlineQuery(
-    [
-      {
-        type: "article",
-        id: "text-effect",
-        title: "Text Effects",
-        input_message_content: {
-          message_text: `Original: ${originalText}
-Modified: ${modifiedText}`,
-          parse_mode: "HTML",
-        },
-        reply_markup: new InlineKeyboard().switchInline("Share", fullQuery),
-        url: "http://t.me/EludaDevSmarterBot",
-        description: "Create stylish Unicode text, all within Telegram.",
-      },
-    ],
-    { cache_time: 30 * 24 * 3600 } // one month in seconds
-  );
+    await ctx.reply(description);
 });
 
-// Return empty result list for other queries.
-bot.on("inline_query", (ctx) => ctx.answerInlineQuery([]));
+bot.command('find', async (ctx) => {
+    const userId = ctx.from.id;
+    const activeUsers = Object.keys(chatSessions).length + waitingList.length;
+    const chatSession = Object.keys(chatSessions).length / 2;
+    const waitingLists = waitingList.length;
 
-// Handle text effects from the effect keyboard
-for (const effect of allEffects) {
-  const allEffectCodes = allEffects.map((effect) => effect.code);
+    await ctx.reply(`Searching for a stranger... Active users: ${activeUsers}\nChat connect pairs: ${chatSession}\nWaiting Lists: ${waitingLists}`);
 
-  bot.callbackQuery(effectCallbackCodeAccessor(effect.code), async (ctx) => {
-    const { originalText } = parseTextEffectResponse(ctx.msg?.text || "");
-    const modifiedText = applyTextEffect(originalText, effect.code);
+    if (chatSessions[userId]) {
+        await ctx.reply("You are already in a chat. Use /end to leave the chat.");
+    } else if (waitingList.includes(userId)) {
+        await ctx.reply("You are already in the waiting list. Please wait for a partner to be assigned.");
+    } else {
+        waitingList.push(userId);
+        tryMatchPartners();
+    }
+});
 
-    await ctx.editMessageText(
-      textEffectResponseAccessor(originalText, modifiedText),
-      {
-        reply_markup: effectsKeyboardAccessor(
-          allEffectCodes.filter((code) => code !== effect.code)
-        ),
-      }
-    );
-  });
+// Define other command handlers (/end, /next, /blockon, /unblock) similarly...
+
+bot.on('message', async (ctx) => {
+    const { text } = ctx.message;
+    const userId = ctx.from.id;
+
+    if (chatSessions[userId]) {
+        const partnerId = chatSessions[userId];
+        if (partnerId) {
+            if (blockerEnabled && containsBlockedWord(text)) {
+                await ctx.reply("Your partner enabled the blocker. Please refrain from using toxic or inappropriate language and respect your partner.");
+                return;
+            }
+            await bot.api.sendMessage(partnerId, text);
+        } else {
+            await ctx.reply("You don't have an ongoing chat. Use /find to search for a partner to chat with.");
+        }
+    } else {
+        await ctx.reply("You don't have an ongoing chat. Use /find to search for a partner to chat with.");
+    }
+});
+
+// Define other message handlers (image, sticker, voice, video) similarly...
+
+function tryMatchPartners() {
+    while (waitingList.length >= 2) {
+        const userId1 = waitingList.shift();
+        const userId2 = waitingList.shift();
+
+        chatSessions[userId1] = userId2;
+        chatSessions[userId2] = userId1;
+
+        bot.api.sendMessage(userId1, "Partner found! Remember to speak in English with your partner.");
+        bot.api.sendMessage(userId2, "Partner found! Remember to speak in English with your partner.");
+    }
 }
 
-// Handle the /about command
-const aboutUrlKeyboard = new InlineKeyboard().url(
-  "Host your own bot for free.",
-  "https://cyclic.sh/"
-);
+// Define containsBlockedWord function...
 
-// Suggest commands in the menu
-bot.api.setMyCommands([
-  { command: "yo", description: "Be greeted by the bot" },
-  {
-    command: "effect",
-    description: "Apply text effects on the text. (usage: /effect [text])",
-  },
-]);
+bot.use((ctx) => {
+    const userId = ctx.from.id;
+    if (Object.values(chatSessions).includes(userId)) {
+        return ctx.reply("How do you feel about this message?", {
+            reply_markup: Markup.keyboard([
+                ['👍 Like', '👎 Dislike'],
+                ['😄 Happy', '😔 Sad']
+            ]).oneTime()
+        });
+    }
+});
 
-// Handle all other messages and the /start command
-const introductionMessage = `Hello! I'm a Telegram bot.
-I'm powered by Cyclic, the next-generation serverless computing platform.
-
-<b>Commands</b>
-/yo - Be greeted by me
-/effect [text] - Show a keyboard to apply text effects to [text]`;
-
-const replyWithIntro = (ctx: any) =>
-  ctx.reply(introductionMessage, {
-    reply_markup: aboutUrlKeyboard,
-    parse_mode: "HTML",
-  });
-
-bot.command("start", replyWithIntro);
-bot.on("message", replyWithIntro);
+bot.on('message', async (ctx) => {
+    try {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // introduce a delay
+        const retMsg = await ctx.reply("response message");
+        console.log(retMsg);
+        // assert retMsg.content_type == 'text';
+    } catch (error) {
+        if (error instanceof Error && error.message.includes("bot was blocked by the user")) {
+            const userId = ctx.from.id;
+            await ctx.reply("Sorry, you have blocked my bot. Please press or type /next");
+        } else {
+            throw error;
+        }
+    }
+});
 
 // Start the server
 if (process.env.NODE_ENV === "production") {
